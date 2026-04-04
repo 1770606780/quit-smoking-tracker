@@ -5,6 +5,8 @@ class QuitSmokingApp {
         this.currentDate = new Date();
         this.selectedDate = new Date();
         this.currentQuantity = 0;
+        this.currentUser = null;
+        this.users = this.loadUsers();
         this.records = this.loadRecords();
         
         this.init();
@@ -12,10 +14,98 @@ class QuitSmokingApp {
 
     init() {
         this.bindEvents();
+        this.checkAuth();
         this.renderCalendar();
         this.updateStats();
         this.renderChart();
         this.selectDate(new Date());
+    }
+
+    // ===== 用户管理 =====
+    loadUsers() {
+        const saved = localStorage.getItem('smokingUsers');
+        const users = saved ? JSON.parse(saved) : {};
+        // 默认添加管理员账号
+        if (!users.admin) {
+            users.admin = {
+                password: 'admin123',
+                role: 'admin',
+                createdAt: new Date().toISOString()
+            };
+            this.saveUsers(users);
+        }
+        return users;
+    }
+
+    saveUsers(users) {
+        localStorage.setItem('smokingUsers', JSON.stringify(users));
+    }
+
+    register(username, password) {
+        if (this.users[username]) {
+            return { success: false, message: '用户名已存在' };
+        }
+        
+        this.users[username] = {
+            password: password,
+            role: 'user',
+            createdAt: new Date().toISOString()
+        };
+        
+        this.saveUsers(this.users);
+        return { success: true, message: '注册成功' };
+    }
+
+    login(username, password) {
+        const user = this.users[username];
+        if (!user) {
+            return { success: false, message: '用户名不存在' };
+        }
+        if (user.password !== password) {
+            return { success: false, message: '密码错误' };
+        }
+        
+        this.currentUser = username;
+        localStorage.setItem('currentUser', username);
+        this.updateAuthUI();
+        this.renderSocialSection();
+        return { success: true, message: '登录成功' };
+    }
+
+    logout() {
+        this.currentUser = null;
+        localStorage.removeItem('currentUser');
+        this.updateAuthUI();
+        this.hideSocialSection();
+    }
+
+    checkAuth() {
+        const savedUser = localStorage.getItem('currentUser');
+        if (savedUser && this.users[savedUser]) {
+            this.currentUser = savedUser;
+            this.updateAuthUI();
+            this.renderSocialSection();
+        }
+    }
+
+    updateAuthUI() {
+        const currentUserEl = document.getElementById('currentUser');
+        const loginBtn = document.getElementById('loginBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const socialSection = document.getElementById('socialSection');
+        
+        if (this.currentUser) {
+            currentUserEl.textContent = `欢迎，${this.currentUser}`;
+            currentUserEl.style.display = 'block';
+            loginBtn.style.display = 'none';
+            logoutBtn.style.display = 'block';
+            socialSection.style.display = 'block';
+        } else {
+            currentUserEl.style.display = 'none';
+            loginBtn.style.display = 'block';
+            logoutBtn.style.display = 'none';
+            socialSection.style.display = 'none';
+        }
     }
 
     // ===== 数据存储 =====
@@ -26,6 +116,13 @@ class QuitSmokingApp {
 
     saveRecords() {
         localStorage.setItem('smokingRecords', JSON.stringify(this.records));
+    }
+
+    getUserRecords(username) {
+        if (!this.records[username]) {
+            this.records[username] = {};
+        }
+        return this.records[username];
     }
 
     // ===== 事件绑定 =====
@@ -57,6 +154,87 @@ class QuitSmokingApp {
         // 保存记录
         document.getElementById('saveBtn').addEventListener('click', () => {
             this.saveRecord();
+        });
+
+        // 登录/注册模态框
+        const authModal = document.getElementById('authModal');
+        const loginBtn = document.getElementById('loginBtn');
+        const closeModal = document.getElementById('closeModal');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        loginBtn.addEventListener('click', () => {
+            authModal.classList.add('show');
+        });
+
+        closeModal.addEventListener('click', () => {
+            authModal.classList.remove('show');
+        });
+
+        // 点击模态框外部关闭
+        authModal.addEventListener('click', (e) => {
+            if (e.target === authModal) {
+                authModal.classList.remove('show');
+            }
+        });
+
+        // 切换登录/注册标签
+        document.querySelectorAll('.auth-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+                document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.auth-form').forEach(f => f.style.display = 'none');
+                tab.classList.add('active');
+                document.getElementById(`${tabName}Form`).style.display = 'flex';
+                document.getElementById('modalTitle').textContent = tabName === 'login' ? '登录' : '注册';
+            });
+        });
+
+        // 登录表单提交
+        document.getElementById('loginForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            const result = this.login(username, password);
+            if (result.success) {
+                authModal.classList.remove('show');
+                this.showToast(result.message);
+            } else {
+                alert(result.message);
+            }
+        });
+
+        // 注册表单提交
+        document.getElementById('registerForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const username = document.getElementById('registerUsername').value;
+            const password = document.getElementById('registerPassword').value;
+            const confirmPassword = document.getElementById('registerConfirmPassword').value;
+            
+            if (password !== confirmPassword) {
+                alert('两次输入的密码不一致');
+                return;
+            }
+            
+            const result = this.register(username, password);
+            if (result.success) {
+                alert(result.message);
+                // 切换到登录表单
+                document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.auth-form').forEach(f => f.style.display = 'none');
+                document.querySelector('.auth-tab[data-tab="login"]').classList.add('active');
+                document.getElementById('loginForm').style.display = 'flex';
+                document.getElementById('modalTitle').textContent = '登录';
+                // 填充用户名
+                document.getElementById('loginUsername').value = username;
+            } else {
+                alert(result.message);
+            }
+        });
+
+        // 退出登录
+        logoutBtn.addEventListener('click', () => {
+            this.logout();
+            this.showToast('已退出登录');
         });
     }
 
@@ -171,16 +349,22 @@ class QuitSmokingApp {
 
     // ===== 保存记录 =====
     saveRecord() {
+        if (!this.currentUser) {
+            alert('请先登录');
+            return;
+        }
+
         if (this.currentQuantity < 0) {
             alert('抽烟数量不能为负数');
             return;
         }
 
+        const userRecords = this.getUserRecords(this.currentUser);
         const dateKey = this.getDateKey(this.selectedDate);
         const note = document.getElementById('noteInput').value.trim();
         
-        if (!this.records[dateKey]) {
-            this.records[dateKey] = [];
+        if (!userRecords[dateKey]) {
+            userRecords[dateKey] = [];
         }
 
         const record = {
@@ -190,7 +374,7 @@ class QuitSmokingApp {
             timestamp: new Date().toISOString()
         };
 
-        this.records[dateKey].push(record);
+        userRecords[dateKey].push(record);
         this.saveRecords();
         
         // 重置输入
@@ -203,6 +387,7 @@ class QuitSmokingApp {
         this.renderDayRecords();
         this.updateStats();
         this.renderChart();
+        this.renderSocialSection();
         
         // 显示成功提示
         this.showToast('记录已保存');
@@ -210,24 +395,38 @@ class QuitSmokingApp {
 
     // ===== 删除记录 =====
     deleteRecord(dateKey, recordId) {
-        if (this.records[dateKey]) {
-            this.records[dateKey] = this.records[dateKey].filter(r => r.id !== recordId);
-            if (this.records[dateKey].length === 0) {
-                delete this.records[dateKey];
+        if (!this.currentUser) {
+            alert('请先登录');
+            return;
+        }
+
+        const userRecords = this.getUserRecords(this.currentUser);
+        if (userRecords[dateKey]) {
+            userRecords[dateKey] = userRecords[dateKey].filter(r => r.id !== recordId);
+            if (userRecords[dateKey].length === 0) {
+                delete userRecords[dateKey];
             }
             this.saveRecords();
             this.renderCalendar();
             this.renderDayRecords();
             this.updateStats();
             this.renderChart();
+            this.renderSocialSection();
             this.showToast('记录已删除');
         }
     }
 
     // ===== 渲染当日记录 =====
     renderDayRecords() {
+        if (!this.currentUser) {
+            const recordsList = document.getElementById('recordsList');
+            recordsList.innerHTML = '<div class="empty-state">请先登录</div>';
+            return;
+        }
+
+        const userRecords = this.getUserRecords(this.currentUser);
         const dateKey = this.getDateKey(this.selectedDate);
-        const dayRecords = this.records[dateKey] || [];
+        const dayRecords = userRecords[dateKey] || [];
         const recordsList = document.getElementById('recordsList');
         
         if (dayRecords.length === 0) {
@@ -271,10 +470,21 @@ class QuitSmokingApp {
     // ===== 更新统计 =====
     updateStats() {
         const today = new Date();
+        
+        if (!this.currentUser) {
+            // 未登录时显示默认值
+            document.getElementById('todayCount').textContent = '0';
+            document.getElementById('weekCount').textContent = '0';
+            document.getElementById('monthCount').textContent = '0';
+            document.getElementById('quitDays').textContent = '0';
+            return;
+        }
+
+        const userRecords = this.getUserRecords(this.currentUser);
         const todayKey = this.getDateKey(today);
         
         // 今日统计
-        const todayRecords = this.records[todayKey] || [];
+        const todayRecords = userRecords[todayKey] || [];
         const todayCount = todayRecords.reduce((sum, r) => sum + r.quantity, 0);
         document.getElementById('todayCount').textContent = 
             todayCount % 1 === 0 ? todayCount : todayCount.toFixed(1);
@@ -287,8 +497,8 @@ class QuitSmokingApp {
             const date = new Date(weekStart);
             date.setDate(weekStart.getDate() + i);
             const key = this.getDateKey(date);
-            if (this.records[key]) {
-                weekCount += this.records[key].reduce((sum, r) => sum + r.quantity, 0);
+            if (userRecords[key]) {
+                weekCount += userRecords[key].reduce((sum, r) => sum + r.quantity, 0);
             }
         }
         document.getElementById('weekCount').textContent = 
@@ -297,7 +507,7 @@ class QuitSmokingApp {
         // 本月统计
         const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
         let monthCount = 0;
-        for (const [key, records] of Object.entries(this.records)) {
+        for (const [key, records] of Object.entries(userRecords)) {
             const recordDate = new Date(key);
             if (recordDate >= monthStart && recordDate <= today) {
                 monthCount += records.reduce((sum, r) => sum + r.quantity, 0);
@@ -306,42 +516,17 @@ class QuitSmokingApp {
         document.getElementById('monthCount').textContent = 
             monthCount % 1 === 0 ? monthCount : monthCount.toFixed(1);
 
-        // 戒烟天数（连续0根的天数）
-        let quitDays = 0;
-        const checkDate = new Date(today);
-        const maxDays = 365; // 最多检查365天
-        let daysChecked = 0;
-        let hasAnyRecord = false;
-        
-        // 先检查是否有任何记录
-        for (const [key, records] of Object.entries(this.records)) {
+        // 抽烟天数（有记录的天数）
+        let smokingDays = 0;
+        for (const [key, records] of Object.entries(userRecords)) {
             if (records.length > 0) {
-                hasAnyRecord = true;
-                break;
+                const dayTotal = records.reduce((sum, r) => sum + r.quantity, 0);
+                if (dayTotal > 0) {
+                    smokingDays++;
+                }
             }
         }
-        
-        // 如果没有任何记录，戒烟天数为0
-        if (!hasAnyRecord) {
-            document.getElementById('quitDays').textContent = 0;
-            return;
-        }
-        
-        // 有记录时，计算连续戒烟天数
-        while (daysChecked < maxDays) {
-            const key = this.getDateKey(checkDate);
-            const dayRecords = this.records[key];
-            const dayTotal = dayRecords ? dayRecords.reduce((sum, r) => sum + r.quantity, 0) : 0;
-            
-            if (dayTotal === 0) {
-                quitDays++;
-                checkDate.setDate(checkDate.getDate() - 1);
-                daysChecked++;
-            } else {
-                break;
-            }
-        }
-        document.getElementById('quitDays').textContent = quitDays;
+        document.getElementById('quitDays').textContent = smokingDays;
     }
 
     // ===== 渲染趋势图表 =====
@@ -358,6 +543,18 @@ class QuitSmokingApp {
         const height = canvas.height;
         const padding = { top: 20, right: 20, bottom: 40, left: 40 };
         
+        if (!this.currentUser) {
+            // 未登录时显示提示
+            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = '#C7C7CC';
+            ctx.font = '14px -apple-system, BlinkMacSystemFont, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('请先登录', width / 2, height / 2);
+            return;
+        }
+
+        const userRecords = this.getUserRecords(this.currentUser);
+        
         // 获取近7天数据
         const data = [];
         const labels = [];
@@ -367,7 +564,7 @@ class QuitSmokingApp {
             const date = new Date(today);
             date.setDate(date.getDate() - i);
             const key = this.getDateKey(date);
-            const records = this.records[key] || [];
+            const records = userRecords[key] || [];
             const total = records.reduce((sum, r) => sum + r.quantity, 0);
             data.push(total);
             labels.push(date.getDate() + '日');
@@ -463,6 +660,101 @@ class QuitSmokingApp {
         ctx.lineTo(width - padding.right, padding.top + chartHeight);
         ctx.closePath();
         ctx.fill();
+    }
+
+    // ===== 社交功能 =====
+    renderSocialSection() {
+        if (!this.currentUser) return;
+
+        const friendsList = document.getElementById('friendsList');
+        const friendsRecordsList = document.getElementById('friendsRecordsList');
+
+        // 渲染好友列表
+        const users = Object.keys(this.users);
+        friendsList.innerHTML = users.map(username => {
+            if (username === this.currentUser) return '';
+            return `
+                <div class="friend-item" data-username="${username}">
+                    <div class="friend-avatar">${username[0].toUpperCase()}</div>
+                    <div class="friend-name">${username}</div>
+                </div>
+            `;
+        }).join('');
+
+        // 绑定好友点击事件
+        friendsList.querySelectorAll('.friend-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const username = item.dataset.username;
+                this.showFriendRecords(username);
+                // 更新选中状态
+                friendsList.querySelectorAll('.friend-item').forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+            });
+        });
+
+        // 默认显示第一个好友的记录
+        if (users.length > 1) {
+            const firstFriend = users.find(username => username !== this.currentUser);
+            if (firstFriend) {
+                this.showFriendRecords(firstFriend);
+                const firstFriendItem = friendsList.querySelector(`[data-username="${firstFriend}"]`);
+                if (firstFriendItem) {
+                    firstFriendItem.classList.add('active');
+                }
+            }
+        }
+    }
+
+    showFriendRecords(username) {
+        const friendsRecordsList = document.getElementById('friendsRecordsList');
+        const friendRecords = this.getUserRecords(username);
+
+        // 收集所有记录并按时间排序
+        const allRecords = [];
+        for (const [dateKey, records] of Object.entries(friendRecords)) {
+            records.forEach(record => {
+                allRecords.push({
+                    ...record,
+                    date: dateKey
+                });
+            });
+        }
+
+        // 按时间降序排序
+        allRecords.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        if (allRecords.length === 0) {
+            friendsRecordsList.innerHTML = '<div class="empty-state">暂无记录</div>';
+            return;
+        }
+
+        // 显示最近的10条记录
+        const recentRecords = allRecords.slice(0, 10);
+        friendsRecordsList.innerHTML = recentRecords.map(record => {
+            const time = new Date(record.timestamp).toLocaleString('zh-CN', { 
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+            const quantity = record.quantity % 1 === 0 ? record.quantity : record.quantity.toFixed(1);
+            
+            return `
+                <div class="friend-record-item">
+                    <div class="friend-record-header">
+                        <span class="friend-record-user">${username}</span>
+                        <span class="friend-record-time">${time}</span>
+                    </div>
+                    <div class="friend-record-count">抽了 ${quantity} 根烟</div>
+                    ${record.note ? `<div class="friend-record-note">${record.note}</div>` : ''}
+                </div>
+            `;
+        }).join('');
+    }
+
+    hideSocialSection() {
+        const socialSection = document.getElementById('socialSection');
+        socialSection.style.display = 'none';
     }
 
     // ===== 工具方法 =====
