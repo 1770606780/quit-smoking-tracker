@@ -92,6 +92,7 @@ class QuitSmokingApp {
         const currentUserEl = document.getElementById('currentUser');
         const loginBtn = document.getElementById('loginBtn');
         const logoutBtn = document.getElementById('logoutBtn');
+        const adminBtn = document.getElementById('adminBtn');
         const socialSection = document.getElementById('socialSection');
         
         if (this.currentUser) {
@@ -100,10 +101,18 @@ class QuitSmokingApp {
             loginBtn.style.display = 'none';
             logoutBtn.style.display = 'block';
             socialSection.style.display = 'block';
+            
+            // 只对 admin 显示管理员按钮
+            if (this.currentUser === 'admin') {
+                adminBtn.style.display = 'block';
+            } else {
+                adminBtn.style.display = 'none';
+            }
         } else {
             currentUserEl.style.display = 'none';
             loginBtn.style.display = 'block';
             logoutBtn.style.display = 'none';
+            adminBtn.style.display = 'none';
             socialSection.style.display = 'none';
         }
     }
@@ -235,6 +244,52 @@ class QuitSmokingApp {
         logoutBtn.addEventListener('click', () => {
             this.logout();
             this.showToast('已退出登录');
+        });
+
+        // 管理员功能
+        const adminBtn = document.getElementById('adminBtn');
+        const adminModal = document.getElementById('adminModal');
+        const closeAdminModal = document.getElementById('closeAdminModal');
+
+        adminBtn.addEventListener('click', () => {
+            if (this.currentUser === 'admin') {
+                adminModal.classList.add('show');
+                this.renderAdminPanel();
+            }
+        });
+
+        closeAdminModal.addEventListener('click', () => {
+            adminModal.classList.remove('show');
+        });
+
+        // 点击模态框外部关闭
+        adminModal.addEventListener('click', (e) => {
+            if (e.target === adminModal) {
+                adminModal.classList.remove('show');
+            }
+        });
+
+        // 管理员标签切换
+        document.querySelectorAll('.admin-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+                document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.admin-panel').forEach(p => p.style.display = 'none');
+                tab.classList.add('active');
+                document.getElementById(`${tabName}Panel`).style.display = 'block';
+                
+                // 重新渲染对应面板
+                if (tabName === 'users') {
+                    this.renderUsersList();
+                } else if (tabName === 'stats') {
+                    this.renderGlobalStats();
+                }
+            });
+        });
+
+        // 保存设置
+        document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+            this.saveSettings();
         });
     }
 
@@ -755,6 +810,128 @@ class QuitSmokingApp {
     hideSocialSection() {
         const socialSection = document.getElementById('socialSection');
         socialSection.style.display = 'none';
+    }
+
+    // ===== 管理员功能 =====
+    renderAdminPanel() {
+        this.renderUsersList();
+        this.renderGlobalStats();
+    }
+
+    renderUsersList() {
+        const usersList = document.getElementById('usersList');
+        const users = this.users;
+
+        usersList.innerHTML = Object.entries(users).map(([username, user]) => {
+            return `
+                <div class="user-item">
+                    <div class="user-info">
+                        <div class="user-avatar">${username[0].toUpperCase()}</div>
+                        <div class="user-details">
+                            <h4>${username} ${username === 'admin' ? '(管理员)' : ''}</h4>
+                            <p>角色: ${user.role}</p>
+                            <p>注册时间: ${new Date(user.createdAt).toLocaleString('zh-CN')}</p>
+                        </div>
+                    </div>
+                    <div class="user-actions">
+                        ${username !== 'admin' ? `
+                            <button class="action-btn reset" data-username="${username}" title="重置密码">重置密码</button>
+                            <button class="action-btn delete" data-username="${username}" title="删除用户">删除</button>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // 绑定按钮事件
+        usersList.querySelectorAll('.action-btn.reset').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const username = btn.dataset.username;
+                this.resetUserPassword(username);
+            });
+        });
+
+        usersList.querySelectorAll('.action-btn.delete').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const username = btn.dataset.username;
+                this.deleteUser(username);
+            });
+        });
+    }
+
+    renderGlobalStats() {
+        const globalStats = document.getElementById('globalStats');
+        const users = Object.keys(this.users);
+        let totalUsers = users.length;
+        let totalRecords = 0;
+        let totalCigarettes = 0;
+
+        // 计算全局统计数据
+        for (const username of users) {
+            const userRecords = this.getUserRecords(username);
+            for (const [dateKey, records] of Object.entries(userRecords)) {
+                totalRecords += records.length;
+                totalCigarettes += records.reduce((sum, r) => sum + r.quantity, 0);
+            }
+        }
+
+        globalStats.innerHTML = `
+            <div class="global-stat-card">
+                <div class="global-stat-value">${totalUsers}</div>
+                <div class="global-stat-label">总用户数</div>
+            </div>
+            <div class="global-stat-card">
+                <div class="global-stat-value">${totalRecords}</div>
+                <div class="global-stat-label">总记录数</div>
+            </div>
+            <div class="global-stat-card">
+                <div class="global-stat-value">${totalCigarettes % 1 === 0 ? totalCigarettes : totalCigarettes.toFixed(1)}</div>
+                <div class="global-stat-label">总抽烟数</div>
+            </div>
+            <div class="global-stat-card">
+                <div class="global-stat-value">${new Date().toLocaleDateString('zh-CN')}</div>
+                <div class="global-stat-label">统计日期</div>
+            </div>
+        `;
+    }
+
+    saveSettings() {
+        const systemName = document.getElementById('systemName').value;
+        const adminPassword = document.getElementById('adminPassword').value;
+
+        // 更新管理员密码
+        if (adminPassword) {
+            this.users.admin.password = adminPassword;
+            this.saveUsers(this.users);
+        }
+
+        // 更新系统名称
+        if (systemName) {
+            document.querySelector('.header h1').textContent = systemName;
+        }
+
+        this.showToast('设置已保存');
+    }
+
+    deleteUser(username) {
+        if (confirm(`确定要删除用户 ${username} 吗？`)) {
+            delete this.users[username];
+            delete this.records[username];
+            this.saveUsers(this.users);
+            this.saveRecords();
+            this.renderUsersList();
+            this.renderGlobalStats();
+            this.showToast('用户已删除');
+        }
+    }
+
+    resetUserPassword(username) {
+        const newPassword = prompt(`请输入 ${username} 的新密码：`);
+        if (newPassword) {
+            this.users[username].password = newPassword;
+            this.saveUsers(this.users);
+            this.showToast('密码已重置');
+        }
     }
 
     // ===== 工具方法 =====

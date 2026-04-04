@@ -54,11 +54,57 @@
             </div>
         </div>
 
+        <!-- 管理员模态框 -->
+        <div class="modal" id="adminModal">
+            <div class="modal-content" style="width: 600px;">
+                <div class="modal-header">
+                    <h2>管理员面板</h2>
+                    <button class="close-btn" id="closeAdminModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="admin-tabs">
+                        <button class="admin-tab active" data-tab="users">用户管理</button>
+                        <button class="admin-tab" data-tab="stats">全局统计</button>
+                        <button class="admin-tab" data-tab="settings">系统设置</button>
+                    </div>
+                    
+                    <!-- 用户管理 -->
+                    <div class="admin-panel" id="usersPanel">
+                        <h3>用户列表</h3>
+                        <div class="users-list" id="usersList"></div>
+                    </div>
+                    
+                    <!-- 全局统计 -->
+                    <div class="admin-panel" id="statsPanel" style="display: none;">
+                        <h3>全局统计</h3>
+                        <div class="global-stats" id="globalStats"></div>
+                    </div>
+                    
+                    <!-- 系统设置 -->
+                    <div class="admin-panel" id="settingsPanel" style="display: none;">
+                        <h3>系统设置</h3>
+                        <div class="settings-form">
+                            <div class="form-group">
+                                <label>系统名称</label>
+                                <input type="text" id="systemName" value="戒烟记录">
+                            </div>
+                            <div class="form-group">
+                                <label>默认管理员密码</label>
+                                <input type="password" id="adminPassword" value="admin123">
+                            </div>
+                            <button class="auth-btn" id="saveSettingsBtn">保存设置</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <header class="header">
             <div class="header-top">
                 <h1>戒烟记录</h1>
                 <div class="user-controls">
                     <span id="currentUser" style="display: none;"></span>
+                    <button class="user-btn" id="adminBtn" style="display: none;">管理员</button>
                     <button class="user-btn" id="loginBtn">登录/注册</button>
                     <button class="user-btn" id="logoutBtn" style="display: none;">退出</button>
                 </div>
