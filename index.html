@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>戒烟记录</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>戒烟记录</h1>
+            <p class="subtitle">记录每一天，迈向健康生活</p>
+        </header>
+
+        <main class="main-content">
+            <!-- 统计卡片 -->
+            <div class="stats-cards">
+                <div class="stat-card">
+                    <div class="stat-value" id="todayCount">0</div>
+                    <div class="stat-label">今日抽烟</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="weekCount">0</div>
+                    <div class="stat-label">本周累计</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="monthCount">0</div>
+                    <div class="stat-label">本月累计</div>
+                </div>
+                <div class="stat-card highlight">
+                    <div class="stat-value" id="quitDays">0</div>
+                    <div class="stat-label">戒烟天数</div>
+                </div>
+            </div>
+
+            <!-- 日历和输入区域 -->
+            <div class="content-grid">
+                <!-- 日历组件 -->
+                <div class="calendar-section">
+                    <div class="calendar-header">
+                        <button class="nav-btn" id="prevMonth">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="15,18 9,12 15,6"></polyline>
+                            </svg>
+                        </button>
+                        <div class="current-month" id="currentMonth"></div>
+                        <button class="nav-btn" id="nextMonth">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9,18 15,12 9,6"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="calendar-weekdays">
+                        <div>日</div>
+                        <div>一</div>
+                        <div>二</div>
+                        <div>三</div>
+                        <div>四</div>
+                        <div>五</div>
+                        <div>六</div>
+                    </div>
+                    <div class="calendar-days" id="calendarDays"></div>
+                </div>
+
+                <!-- 记录输入区域 -->
+                <div class="input-section">
+                    <div class="selected-date" id="selectedDate">请选择日期</div>
+                    
+                    <div class="input-group">
+                        <label>今日抽烟数量</label>
+                        <div class="quantity-selector">
+                            <button class="qty-btn" id="decreaseBtn">-</button>
+                            <div class="qty-display">
+                                <span id="quantity">0</span>
+                                <span class="unit">根</span>
+                            </div>
+                            <button class="qty-btn" id="increaseBtn">+</button>
+                        </div>
+                        <div class="qty-hint">最小单位 0.5 根</div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>备注（可选）</label>
+                        <textarea id="noteInput" placeholder="记录一下今天的心情或触发因素..."></textarea>
+                    </div>
+
+                    <button class="save-btn" id="saveBtn">保存记录</button>
+
+                    <!-- 当日记录详情 -->
+                    <div class="day-records" id="dayRecords">
+                        <h3>当日记录</h3>
+                        <div class="records-list" id="recordsList"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 趋势图表 -->
+            <div class="chart-section">
+                <h2>近7天趋势</h2>
+                <div class="chart-container">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
