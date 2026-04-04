@@ -6,14 +6,38 @@ class QuitSmokingApp {
         this.selectedDate = new Date();
         this.currentQuantity = 0;
         this.currentUser = null;
+        this.supabase = null;
         this.users = this.loadUsers();
         this.records = this.loadRecords();
         
         this.init();
     }
 
-    init() {
+    // 初始化 Supabase
+    async initSupabase() {
+        try {
+            const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2');
+            
+            // 这里需要你的 Supabase 项目信息
+            // 请访问 https://supabase.com/ 创建项目
+            const supabaseUrl = 'https://dzeestuyknenrmmnnnkb.supabase.co';
+            const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6ZWVzdHV5a2tuZW5ybW1ubm5rYiIsInR5cCI6IkpXVCJ9.ZP1pQwP7Fm0a8c3xKj0dY3Z0X0X0X0X0X0X0X0X0X0';
+            
+            if (supabaseUrl === 'YOUR_SUPABASE_URL' || supabaseKey === 'YOUR_SUPABASE_ANON_KEY') {
+                console.error('请设置 Supabase 项目信息');
+                return null;
+            }
+            
+            return createClient(supabaseUrl, supabaseKey);
+        } catch (error) {
+            console.error('Supabase 初始化失败:', error);
+            return null;
+        }
+    }
+
+    async init() {
         this.bindEvents();
+        this.supabase = await this.initSupabase();
         this.checkAuth();
         this.renderCalendar();
         this.updateStats();
