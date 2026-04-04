@@ -38,6 +38,7 @@ class QuitSmokingApp {
     async init() {
         this.bindEvents();
         this.supabase = await this.initSupabase();
+        this.records = await this.loadRecords();
         this.checkAuth();
         this.renderCalendar();
         this.updateStats();
@@ -142,12 +143,59 @@ class QuitSmokingApp {
     }
 
     // ===== 数据存储 =====
-    loadRecords() {
+    async loadRecords() {
+        try {
+            if (this.supabase) {
+                // 从 Supabase 加载数据
+                const { data, error } = await this.supabase
+                    .from('smoking_records')
+                    .select('*');
+                
+                if (error) {
+                    console.error('从 Supabase 加载数据失败:', error);
+                    // 加载失败时使用本地存储
+                    return this.loadLocalRecords();
+                }
+                
+                // 转换数据格式
+                const records = {};
+                data.forEach(record => {
+                    if (!records[record.username]) {
+                        records[record.username] = {};
+                    }
+                    if (!records[record.username][record.date]) {
+                        records[record.username][record.date] = [];
+                    }
+                    records[record.username][record.date].push({
+                        id: record.id,
+                        quantity: record.quantity,
+                        note: record.note,
+                        timestamp: record.created_at
+                    });
+                });
+                return records;
+            }
+        } catch (error) {
+            console.error('加载数据失败:', error);
+        }
+        // 无法使用 Supabase 时使用本地存储
+        return this.loadLocalRecords();
+    }
+
+    loadLocalRecords() {
         const saved = localStorage.getItem('smokingRecords');
         return saved ? JSON.parse(saved) : {};
     }
 
-    saveRecords() {
+    async saveRecords() {
+        try {
+            if (this.supabase) {
+                // 保存到 Supabase 的逻辑将在 saveRecord 和 deleteRecord 中处理
+            }
+        } catch (error) {
+            console.error('保存数据失败:', error);
+        }
+        // 同时保存到本地存储作为备份
         localStorage.setItem('smokingRecords', JSON.stringify(this.records));
     }
 
@@ -427,7 +475,7 @@ class QuitSmokingApp {
     }
 
     // ===== 保存记录 =====
-    saveRecord() {
+    async saveRecord() {
         if (!this.currentUser) {
             alert('请先登录');
             return;
@@ -453,8 +501,30 @@ class QuitSmokingApp {
             timestamp: new Date().toISOString()
         };
 
+        try {
+            if (this.supabase) {
+                // 保存到 Supabase
+                const { error } = await this.supabase
+                    .from('smoking_records')
+                    .insert({
+                        user_id: this.currentUser,
+                        date: dateKey,
+                        time: new Date().toTimeString().split(' ')[0],
+                        quantity: this.currentQuantity,
+                        note: note,
+                        username: this.currentUser
+                    });
+                
+                if (error) {
+                    console.error('保存到 Supabase 失败:', error);
+                }
+            }
+        } catch (error) {
+            console.error('保存数据失败:', error);
+        }
+
         userRecords[dateKey].push(record);
-        this.saveRecords();
+        await this.saveRecords();
         
         // 重置输入
         this.currentQuantity = 0;
@@ -473,7 +543,7 @@ class QuitSmokingApp {
     }
 
     // ===== 删除记录 =====
-    deleteRecord(dateKey, recordId) {
+    async deleteRecord(dateKey, recordId) {
         if (!this.currentUser) {
             alert('请先登录');
             return;
@@ -481,11 +551,27 @@ class QuitSmokingApp {
 
         const userRecords = this.getUserRecords(this.currentUser);
         if (userRecords[dateKey]) {
+            try {
+                if (this.supabase) {
+                    // 从 Supabase 删除
+                    const { error } = await this.supabase
+                        .from('smoking_records')
+                        .delete()
+                        .eq('id', recordId);
+                    
+                    if (error) {
+                        console.error('从 Supabase 删除失败:', error);
+                    }
+                }
+            } catch (error) {
+                console.error('删除数据失败:', error);
+            }
+
             userRecords[dateKey] = userRecords[dateKey].filter(r => r.id !== recordId);
             if (userRecords[dateKey].length === 0) {
                 delete userRecords[dateKey];
             }
-            this.saveRecords();
+            await this.saveRecords();
             this.renderCalendar();
             this.renderDayRecords();
             this.updateStats();
