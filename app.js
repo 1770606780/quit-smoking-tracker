@@ -157,22 +157,29 @@ class QuitSmokingApp {
                     return this.loadLocalRecords();
                 }
                 
+                console.log('从 Supabase 加载的数据:', data);
+                
                 // 转换数据格式
                 const records = {};
                 data.forEach(record => {
-                    if (!records[record.username]) {
-                        records[record.username] = {};
+                    // 使用 user_id 作为用户名
+                    const username = record.user_id || record.username;
+                    if (!username) return;
+                    
+                    if (!records[username]) {
+                        records[username] = {};
                     }
-                    if (!records[record.username][record.date]) {
-                        records[record.username][record.date] = [];
+                    if (!records[username][record.date]) {
+                        records[username][record.date] = [];
                     }
-                    records[record.username][record.date].push({
+                    records[username][record.date].push({
                         id: record.id,
                         quantity: record.quantity,
                         note: record.note,
                         timestamp: record.created_at
                     });
                 });
+                console.log('转换后的记录:', records);
                 return records;
             }
         } catch (error) {
@@ -503,6 +510,15 @@ class QuitSmokingApp {
 
         try {
             if (this.supabase) {
+                console.log('尝试保存到 Supabase:', {
+                    user_id: this.currentUser,
+                    date: dateKey,
+                    time: new Date().toTimeString().split(' ')[0],
+                    quantity: this.currentQuantity,
+                    note: note,
+                    username: this.currentUser
+                });
+                
                 // 保存到 Supabase
                 const { error } = await this.supabase
                     .from('smoking_records')
@@ -517,10 +533,15 @@ class QuitSmokingApp {
                 
                 if (error) {
                     console.error('保存到 Supabase 失败:', error);
+                    this.showToast('保存到云端失败，使用本地存储');
+                } else {
+                    console.log('保存到 Supabase 成功');
+                    this.showToast('记录已保存到云端');
                 }
             }
         } catch (error) {
             console.error('保存数据失败:', error);
+            this.showToast('网络连接失败，使用本地存储');
         }
 
         userRecords[dateKey].push(record);
