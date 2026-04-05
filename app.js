@@ -16,8 +16,6 @@ class QuitSmokingApp {
     // 初始化 Supabase
     async initSupabase() {
         try {
-            const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2');
-            
             // 这里需要你的 Supabase 项目信息
             // 请访问 https://supabase.com/ 创建项目
             const supabaseUrl = 'https://dzeestuyknenrmmnnnkb.supabase.co';
@@ -28,7 +26,14 @@ class QuitSmokingApp {
                 return null;
             }
             
-            return createClient(supabaseUrl, supabaseKey);
+            // 检查是否已经通过 script 标签加载了 supabase
+            if (window.supabase) {
+                console.log('使用 script 标签加载的 Supabase');
+                return window.supabase.createClient(supabaseUrl, supabaseKey);
+            }
+            
+            console.log('Supabase 未正确加载，使用本地存储');
+            return null;
         } catch (error) {
             console.error('Supabase 初始化失败:', error);
             return null;
@@ -527,8 +532,7 @@ class QuitSmokingApp {
                         date: dateKey,
                         time: new Date().toTimeString().split(' ')[0],
                         quantity: this.currentQuantity,
-                        note: note,
-                        username: this.currentUser
+                        note: note
                     });
                 
                 if (error) {
