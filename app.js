@@ -757,15 +757,25 @@ class QuitSmokingApp {
             return;
         }
 
+        // 验证 recordId 是否有效
+        if (!recordId || isNaN(recordId) || recordId === 'NaN') {
+            console.error('无效的记录 ID:', recordId);
+            this.showToast('删除记录失败：无效的记录 ID');
+            return;
+        }
+
         const userRecords = this.getUserRecords(this.currentUser);
         if (userRecords[dateKey]) {
             try {
                 if (this.supabase) {
+                    // 确保 recordId 是有效的字符串或数字
+                    const idToDelete = typeof recordId === 'string' ? recordId : recordId.toString();
+                    
                     // 从 Supabase 删除
                     const { error } = await this.supabase
                         .from('smoking_records')
                         .delete()
-                        .eq('id', recordId);
+                        .eq('id', idToDelete);
                     
                     if (error) {
                         console.error('从 Supabase 删除失败:', error);
