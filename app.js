@@ -186,7 +186,7 @@ class QuitSmokingApp {
                     // 从 Supabase 加载数据，明确指定列（移除不存在的 date 列）
                     const { data, error } = await this.supabase
                         .from('smoking_records')
-                        .select('id, user_id, time, quantity, note, created_at');
+                        .select('id, user_id, username, time, quantity, note, created_at');
                     
                     if (error) {
                         console.error('从 Supabase 加载数据失败:', error);
@@ -198,10 +198,16 @@ class QuitSmokingApp {
                     
                     // 转换数据格式
                     const records = {};
+                    const userIdToUsername = {};
                     data.forEach(record => {
                         // 使用 user_id 作为用户标识符
                         const userId = record.user_id;
                         if (!userId) return;
+                        
+                        // 保存用户名信息
+                        if (record.username) {
+                            userIdToUsername[userId] = record.username;
+                        }
                         
                         // 从 created_at 中提取日期
                         const dateKey = new Date(record.created_at).toISOString().split('T')[0];
@@ -216,9 +222,13 @@ class QuitSmokingApp {
                             id: record.id,
                             quantity: record.quantity,
                             note: record.note,
-                            timestamp: record.created_at
+                            timestamp: record.created_at,
+                            username: record.username
                         });
                     });
+                    
+                    // 保存用户 ID 到用户名的映射
+                    localStorage.setItem('userIdToUsername', JSON.stringify(userIdToUsername));
                     console.log('转换后的记录:', records);
                     
                     // 更新 this.records 对象
@@ -634,6 +644,7 @@ class QuitSmokingApp {
                                 .from('smoking_records')
                                 .insert({
                                     user_id: this.currentUser,
+                                    username: currentUsername,
                                     time: new Date().toTimeString().split(' ')[0],
                                     quantity: this.currentQuantity,
                                     note: note
@@ -986,6 +997,9 @@ class QuitSmokingApp {
         const currentUsername = localStorage.getItem('currentUsername');
         const currentUserId = this.currentUser;
 
+        // 从本地存储中加载用户 ID 到用户名的映射
+        const userIdToUsername = JSON.parse(localStorage.getItem('userIdToUsername') || '{}');
+
         // 从 records 中获取所有用户 ID
         const userIds = new Set();
         Object.keys(this.records).forEach(userId => {
@@ -996,7 +1010,7 @@ class QuitSmokingApp {
         friendsList.innerHTML = Array.from(userIds).map(userId => {
             if (userId === currentUserId) return '';
             // 尝试获取用户名
-            let username = userId;
+            let username = userIdToUsername[userId] || userId;
             for (const user in this.users) {
                 if (this.users[user].id === userId) {
                     username = user;
@@ -1027,7 +1041,7 @@ class QuitSmokingApp {
         const friendIds = Array.from(userIds).filter(userId => userId !== currentUserId);
         if (friendIds.length > 0) {
             const firstFriendId = friendIds[0];
-            let firstFriendUsername = firstFriendId;
+            let firstFriendUsername = userIdToUsername[firstFriendId] || firstFriendId;
             for (const user in this.users) {
                 if (this.users[user].id === firstFriendId) {
                     firstFriendUsername = user;
