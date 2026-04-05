@@ -982,15 +982,29 @@ class QuitSmokingApp {
         const friendsList = document.getElementById('friendsList');
         const friendsRecordsList = document.getElementById('friendsRecordsList');
 
-        // 获取当前用户名
+        // 获取当前用户名和用户 ID
         const currentUsername = localStorage.getItem('currentUsername');
+        const currentUserId = this.currentUser;
+
+        // 从 records 中获取所有用户 ID
+        const userIds = new Set();
+        Object.keys(this.records).forEach(userId => {
+            userIds.add(userId);
+        });
 
         // 渲染好友列表
-        const users = Object.keys(this.users);
-        friendsList.innerHTML = users.map(username => {
-            if (username === currentUsername) return '';
+        friendsList.innerHTML = Array.from(userIds).map(userId => {
+            if (userId === currentUserId) return '';
+            // 尝试获取用户名
+            let username = userId;
+            for (const user in this.users) {
+                if (this.users[user].id === userId) {
+                    username = user;
+                    break;
+                }
+            }
             return `
-                <div class="friend-item" data-username="${username}">
+                <div class="friend-item" data-userid="${userId}" data-username="${username}">
                     <div class="friend-avatar">${username[0].toUpperCase()}</div>
                     <div class="friend-name">${username}</div>
                 </div>
@@ -1000,10 +1014,9 @@ class QuitSmokingApp {
         // 绑定好友点击事件
         friendsList.querySelectorAll('.friend-item').forEach(item => {
             item.addEventListener('click', () => {
+                const userId = item.dataset.userid;
                 const username = item.dataset.username;
-                // 获取好友的 UUID
-                const friendId = this.users[username].id;
-                this.showFriendRecords(friendId, username);
+                this.showFriendRecords(userId, username);
                 // 更新选中状态
                 friendsList.querySelectorAll('.friend-item').forEach(i => i.classList.remove('active'));
                 item.classList.add('active');
@@ -1011,15 +1024,20 @@ class QuitSmokingApp {
         });
 
         // 默认显示第一个好友的记录
-        if (users.length > 1) {
-            const firstFriend = users.find(username => username !== currentUsername);
-            if (firstFriend) {
-                const friendId = this.users[firstFriend].id;
-                this.showFriendRecords(friendId, firstFriend);
-                const firstFriendItem = friendsList.querySelector(`[data-username="${firstFriend}"]`);
-                if (firstFriendItem) {
-                    firstFriendItem.classList.add('active');
+        const friendIds = Array.from(userIds).filter(userId => userId !== currentUserId);
+        if (friendIds.length > 0) {
+            const firstFriendId = friendIds[0];
+            let firstFriendUsername = firstFriendId;
+            for (const user in this.users) {
+                if (this.users[user].id === firstFriendId) {
+                    firstFriendUsername = user;
+                    break;
                 }
+            }
+            this.showFriendRecords(firstFriendId, firstFriendUsername);
+            const firstFriendItem = friendsList.querySelector(`[data-userid="${firstFriendId}"]`);
+            if (firstFriendItem) {
+                firstFriendItem.classList.add('active');
             }
         }
     }
