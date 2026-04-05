@@ -19,7 +19,7 @@ class QuitSmokingApp {
             // 这里需要你的 Supabase 项目信息
             // 请访问 https://supabase.com/ 创建项目
             const supabaseUrl = 'https://dzeestuyknenrmmnnnkb.supabase.co';
-            const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6ZWVzdHV5a2tuZW5ybW1ubm5rYiIsInR5cCI6IkpXVCJ9.ZP1pQwP7Fm0a8c3xKj0dY3Z0X0X0X0X0X0X0X0X0X0';
+            const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6ZWVzdHV5a25lbnJtbW5ubmtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyODQ0MDMsImV4cCI6MjA5MDg2MDQwM30.IdnT_fHgEoYX2GioUxM9lHImFlaZykhKRnm01DlPiRI';
             
             if (supabaseUrl === 'YOUR_SUPABASE_URL' || supabaseKey === 'YOUR_SUPABASE_ANON_KEY') {
                 console.error('请设置 Supabase 项目信息');
