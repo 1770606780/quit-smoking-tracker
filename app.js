@@ -51,6 +51,14 @@ class QuitSmokingApp {
         this.selectDate(new Date());
     }
 
+    // 生成 UUID 的函数
+    generateUUID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+
     // ===== 用户管理 =====
     loadUsers() {
         const saved = localStorage.getItem('smokingUsers');
@@ -58,10 +66,23 @@ class QuitSmokingApp {
         // 默认添加管理员账号
         if (!users.admin) {
             users.admin = {
-                password: 'admin123',
+                password: 'LIUhao0.0',
                 role: 'admin',
+                id: '00000000-0000-4000-8000-000000000000', // 固定的 admin UUID
                 createdAt: new Date().toISOString()
             };
+            this.saveUsers(users);
+        } else if (users.admin.password === 'admin123') {
+            // 更新管理员密码为新密码
+            users.admin.password = 'LIUhao0.0';
+            this.saveUsers(users);
+        } else {
+            // 为现有用户添加 UUID
+            for (const username in users) {
+                if (!users[username].id) {
+                    users[username].id = this.generateUUID();
+                }
+            }
             this.saveUsers(users);
         }
         return users;
@@ -79,6 +100,7 @@ class QuitSmokingApp {
         this.users[username] = {
             password: password,
             role: 'user',
+            id: this.generateUUID(), // 生成 UUID
             createdAt: new Date().toISOString()
         };
         
@@ -95,8 +117,11 @@ class QuitSmokingApp {
             return { success: false, message: '密码错误' };
         }
         
-        this.currentUser = username;
-        localStorage.setItem('currentUser', username);
+        // 使用用户的 UUID 作为 currentUser
+        this.currentUser = user.id;
+        // 同时保存用户名，以便显示
+        localStorage.setItem('currentUser', user.id);
+        localStorage.setItem('currentUsername', username);
         this.updateAuthUI();
         this.renderSocialSection();
         return { success: true, message: '登录成功' };
@@ -105,14 +130,16 @@ class QuitSmokingApp {
     logout() {
         this.currentUser = null;
         localStorage.removeItem('currentUser');
+        localStorage.removeItem('currentUsername');
         this.updateAuthUI();
         this.hideSocialSection();
     }
 
     checkAuth() {
-        const savedUser = localStorage.getItem('currentUser');
-        if (savedUser && this.users[savedUser]) {
-            this.currentUser = savedUser;
+        const savedUserId = localStorage.getItem('currentUser');
+        const savedUsername = localStorage.getItem('currentUsername');
+        if (savedUserId && savedUsername && this.users[savedUsername]) {
+            this.currentUser = savedUserId;
             this.updateAuthUI();
             this.renderSocialSection();
         }
@@ -126,14 +153,18 @@ class QuitSmokingApp {
         const socialSection = document.getElementById('socialSection');
         
         if (this.currentUser) {
-            currentUserEl.textContent = `欢迎，${this.currentUser}`;
+            // 获取用户名
+            const savedUsername = localStorage.getItem('currentUsername');
+            const displayName = savedUsername || '用户';
+            currentUserEl.textContent = `欢迎，${displayName}`;
             currentUserEl.style.display = 'block';
             loginBtn.style.display = 'none';
             logoutBtn.style.display = 'block';
             socialSection.style.display = 'block';
             
-            // 只对 admin 显示管理员按钮
-            if (this.currentUser === 'admin') {
+            // 检查是否是管理员
+            const isAdmin = savedUsername === 'admin';
+            if (isAdmin) {
                 adminBtn.style.display = 'block';
             } else {
                 adminBtn.style.display = 'none';
@@ -151,41 +182,50 @@ class QuitSmokingApp {
     async loadRecords() {
         try {
             if (this.supabase) {
-                // 从 Supabase 加载数据
-                const { data, error } = await this.supabase
-                    .from('smoking_records')
-                    .select('*');
-                
-                if (error) {
-                    console.error('从 Supabase 加载数据失败:', error);
-                    // 加载失败时使用本地存储
+                try {
+                    // 从 Supabase 加载数据，明确指定列（移除不存在的 date 列）
+                    const { data, error } = await this.supabase
+                        .from('smoking_records')
+                        .select('id, user_id, time, quantity, note, created_at');
+                    
+                    if (error) {
+                        console.error('从 Supabase 加载数据失败:', error);
+                        // 加载失败时使用本地存储
+                        return this.loadLocalRecords();
+                    }
+                    
+                    console.log('从 Supabase 加载的数据:', data);
+                    
+                    // 转换数据格式
+                    const records = {};
+                    data.forEach(record => {
+                        // 使用 user_id 作为用户标识符
+                        const userId = record.user_id;
+                        if (!userId) return;
+                        
+                        // 从 created_at 中提取日期
+                        const dateKey = new Date(record.created_at).toISOString().split('T')[0];
+                        
+                        if (!records[userId]) {
+                            records[userId] = {};
+                        }
+                        if (!records[userId][dateKey]) {
+                            records[userId][dateKey] = [];
+                        }
+                        records[userId][dateKey].push({
+                            id: record.id,
+                            quantity: record.quantity,
+                            note: record.note,
+                            timestamp: record.created_at
+                        });
+                    });
+                    console.log('转换后的记录:', records);
+                    return records;
+                } catch (supabaseError) {
+                    console.error('Supabase 操作失败:', supabaseError);
+                    // 操作失败时使用本地存储
                     return this.loadLocalRecords();
                 }
-                
-                console.log('从 Supabase 加载的数据:', data);
-                
-                // 转换数据格式
-                const records = {};
-                data.forEach(record => {
-                    // 使用 user_id 作为用户名
-                    const username = record.user_id || record.username;
-                    if (!username) return;
-                    
-                    if (!records[username]) {
-                        records[username] = {};
-                    }
-                    if (!records[username][record.date]) {
-                        records[username][record.date] = [];
-                    }
-                    records[username][record.date].push({
-                        id: record.id,
-                        quantity: record.quantity,
-                        note: record.note,
-                        timestamp: record.created_at
-                    });
-                });
-                console.log('转换后的记录:', records);
-                return records;
             }
         } catch (error) {
             console.error('加载数据失败:', error);
@@ -290,7 +330,8 @@ class QuitSmokingApp {
             const result = this.login(username, password);
             if (result.success) {
                 authModal.classList.remove('show');
-                this.showToast(result.message);
+                // 显示登录成功的提示，但使用更简洁的内容
+                this.showToast('欢迎回来！');
             } else {
                 alert(result.message);
             }
@@ -515,32 +556,94 @@ class QuitSmokingApp {
 
         try {
             if (this.supabase) {
+                // 获取当前用户名
+                const currentUsername = localStorage.getItem('currentUsername');
+                
                 console.log('尝试保存到 Supabase:', {
                     user_id: this.currentUser,
-                    date: dateKey,
                     time: new Date().toTimeString().split(' ')[0],
                     quantity: this.currentQuantity,
                     note: note,
-                    username: this.currentUser
+                    username: currentUsername
                 });
                 
-                // 保存到 Supabase
-                const { error } = await this.supabase
-                    .from('smoking_records')
-                    .insert({
-                        user_id: this.currentUser,
-                        date: dateKey,
-                        time: new Date().toTimeString().split(' ')[0],
-                        quantity: this.currentQuantity,
-                        note: note
-                    });
+                // 检查 user_id 是否为有效的 UUID 格式
+                const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(this.currentUser);
                 
-                if (error) {
-                    console.error('保存到 Supabase 失败:', error);
-                    this.showToast('保存到云端失败，使用本地存储');
+                if (!isUUID) {
+                    console.error('无效的 user_id 格式，使用本地存储');
+                    this.showToast('用户 ID 格式错误，使用本地存储');
                 } else {
-                    console.log('保存到 Supabase 成功');
-                    this.showToast('记录已保存到云端');
+                    // 尝试保存到 Supabase，使用更简洁的方式
+                    try {
+                        // 先测试 Supabase 连接
+                        const { data: testData, error: testError } = await this.supabase
+                            .from('smoking_records')
+                            .select('*')
+                            .limit(1);
+                        
+                        if (testError) {
+                            console.error('Supabase 连接测试失败:', testError);
+                            this.showToast('云端连接失败，使用本地存储');
+                        } else {
+                            console.log('Supabase 连接测试成功');
+                            
+                            // 检查 users 表中是否存在该用户
+                            try {
+                                const { data: userData, error: userError } = await this.supabase
+                                    .from('users')
+                                    .select('id')
+                                    .eq('id', this.currentUser)
+                                    .limit(1);
+                                
+                                if (userError) {
+                                    console.error('查询用户失败:', userError);
+                                }
+                                
+                                // 如果用户不存在，先创建用户记录
+                                if (!userData || userData.length === 0) {
+                                    const currentUsername = localStorage.getItem('currentUsername');
+                                    const { error: createUserError } = await this.supabase
+                                        .from('users')
+                                        .insert({
+                                            id: this.currentUser,
+                                            username: currentUsername,
+                                            password: 'local_user', // 本地用户密码，实际使用时应该加密
+                                            created_at: new Date().toISOString()
+                                        });
+                                    
+                                    if (createUserError) {
+                                        console.error('创建用户失败:', createUserError);
+                                    } else {
+                                        console.log('用户创建成功');
+                                    }
+                                }
+                            } catch (userError) {
+                                console.error('用户操作失败:', userError);
+                            }
+                            
+                            // 尝试插入记录
+                            const { error } = await this.supabase
+                                .from('smoking_records')
+                                .insert({
+                                    user_id: this.currentUser,
+                                    time: new Date().toTimeString().split(' ')[0],
+                                    quantity: this.currentQuantity,
+                                    note: note
+                                });
+                            
+                            if (error) {
+                                console.error('保存到 Supabase 失败:', error);
+                                this.showToast('保存到云端失败，使用本地存储');
+                            } else {
+                                console.log('保存到 Supabase 成功');
+                                this.showToast('记录已保存到云端');
+                            }
+                        }
+                    } catch (supabaseError) {
+                        console.error('Supabase 操作失败:', supabaseError);
+                        this.showToast('云端连接失败，使用本地存储');
+                    }
                 }
             }
         } catch (error) {
@@ -625,13 +728,22 @@ class QuitSmokingApp {
         }
 
         recordsList.innerHTML = dayRecords.map(record => {
-            const time = new Date(record.timestamp).toLocaleTimeString('zh-CN', { 
-                hour: '2-digit', 
-                minute: '2-digit' 
-            });
+            // 确保时间戳存在
+            let time = '未知时间';
+            if (record.timestamp) {
+                time = new Date(record.timestamp).toLocaleTimeString('zh-CN', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+            } else if (record.created_at) {
+                time = new Date(record.created_at).toLocaleTimeString('zh-CN', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+            }
             const quantity = record.quantity % 1 === 0 ? record.quantity : record.quantity.toFixed(1);
-            
-            return `
+                
+                return `
                 <div class="record-item">
                     <div class="record-info">
                         <div class="record-time">${time}</div>
@@ -859,10 +971,13 @@ class QuitSmokingApp {
         const friendsList = document.getElementById('friendsList');
         const friendsRecordsList = document.getElementById('friendsRecordsList');
 
+        // 获取当前用户名
+        const currentUsername = localStorage.getItem('currentUsername');
+
         // 渲染好友列表
         const users = Object.keys(this.users);
         friendsList.innerHTML = users.map(username => {
-            if (username === this.currentUser) return '';
+            if (username === currentUsername) return '';
             return `
                 <div class="friend-item" data-username="${username}">
                     <div class="friend-avatar">${username[0].toUpperCase()}</div>
@@ -875,7 +990,9 @@ class QuitSmokingApp {
         friendsList.querySelectorAll('.friend-item').forEach(item => {
             item.addEventListener('click', () => {
                 const username = item.dataset.username;
-                this.showFriendRecords(username);
+                // 获取好友的 UUID
+                const friendId = this.users[username].id;
+                this.showFriendRecords(friendId, username);
                 // 更新选中状态
                 friendsList.querySelectorAll('.friend-item').forEach(i => i.classList.remove('active'));
                 item.classList.add('active');
@@ -884,9 +1001,10 @@ class QuitSmokingApp {
 
         // 默认显示第一个好友的记录
         if (users.length > 1) {
-            const firstFriend = users.find(username => username !== this.currentUser);
+            const firstFriend = users.find(username => username !== currentUsername);
             if (firstFriend) {
-                this.showFriendRecords(firstFriend);
+                const friendId = this.users[firstFriend].id;
+                this.showFriendRecords(friendId, firstFriend);
                 const firstFriendItem = friendsList.querySelector(`[data-username="${firstFriend}"]`);
                 if (firstFriendItem) {
                     firstFriendItem.classList.add('active');
@@ -895,9 +1013,9 @@ class QuitSmokingApp {
         }
     }
 
-    showFriendRecords(username) {
+    showFriendRecords(friendId, username) {
         const friendsRecordsList = document.getElementById('friendsRecordsList');
-        const friendRecords = this.getUserRecords(username);
+        const friendRecords = this.getUserRecords(friendId);
 
         // 收集所有记录并按时间排序
         const allRecords = [];
