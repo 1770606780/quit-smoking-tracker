@@ -58,7 +58,7 @@ class QuitSmokingApp {
             if (this.supabase) {
                 const { data, error } = await this.supabase
                     .from('users')
-                    .select('id, username');
+                    .select('id, username, role, created_at');
                 
                 if (error) {
                     console.error('从 Supabase 加载用户信息失败:', error);
@@ -70,13 +70,19 @@ class QuitSmokingApp {
                 // 更新本地用户信息
                 const localUsers = this.loadUsers();
                 data.forEach(user => {
-                    if (!localUsers[user.username]) {
+                    if (localUsers[user.username]) {
+                        // 如果用户存在，更新用户信息
+                        localUsers[user.username].id = user.id;
+                        localUsers[user.username].role = user.role || 'user';
+                        localUsers[user.username].createdAt = user.created_at || new Date().toISOString();
+                    } else {
+                        // 如果用户不存在，创建新用户
                         localUsers[user.username] = {
                             id: user.id,
                             username: user.username,
                             password: 'local_user', // 本地用户密码，实际使用时应该加密
-                            role: 'user',
-                            createdAt: new Date().toISOString()
+                            role: user.role || 'user',
+                            createdAt: user.created_at || new Date().toISOString()
                         };
                     }
                 });
@@ -636,18 +642,33 @@ class QuitSmokingApp {
                             // 检查 users 表中是否存在该用户
                             try {
                                 const currentUsername = localStorage.getItem('currentUsername');
-                                const { data: userData, error: userError } = await this.supabase
+                                
+                                // 先根据用户名查询用户
+                                const { data: userDataByUsername, error: userErrorByUsername } = await this.supabase
                                     .from('users')
-                                    .select('id')
-                                    .eq('id', this.currentUser)
+                                    .select('id, username')
+                                    .eq('username', currentUsername)
                                     .limit(1);
                                 
-                                if (userError) {
-                                    console.error('查询用户失败:', userError);
+                                if (userErrorByUsername) {
+                                    console.error('根据用户名查询用户失败:', userErrorByUsername);
                                 }
                                 
-                                // 如果用户不存在，先创建用户记录
-                                if (!userData || userData.length === 0) {
+                                if (userDataByUsername && userDataByUsername.length > 0) {
+                                    // 如果用户存在，使用数据库中的 ID
+                                    console.log('用户已存在，使用数据库中的 ID:', userDataByUsername[0].id);
+                                    // 更新本地用户 ID
+                                    const localUsers = this.loadUsers();
+                                    if (localUsers[currentUsername]) {
+                                        localUsers[currentUsername].id = userDataByUsername[0].id;
+                                        this.users = localUsers;
+                                        this.saveUsers(localUsers);
+                                        // 更新 currentUser
+                                        this.currentUser = userDataByUsername[0].id;
+                                        localStorage.setItem('currentUser', userDataByUsername[0].id);
+                                    }
+                                } else {
+                                    // 如果用户不存在，创建新用户
                                     const { error: createUserError } = await this.supabase
                                         .from('users')
                                         .insert({
