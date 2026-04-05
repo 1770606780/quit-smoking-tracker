@@ -58,7 +58,7 @@ class QuitSmokingApp {
             if (this.supabase) {
                 const { data, error } = await this.supabase
                     .from('users')
-                    .select('id, username, role, created_at');
+                    .select('id, username, created_at');
                 
                 if (error) {
                     console.error('从 Supabase 加载用户信息失败:', error);
@@ -73,7 +73,6 @@ class QuitSmokingApp {
                     if (localUsers[user.username]) {
                         // 如果用户存在，更新用户信息
                         localUsers[user.username].id = user.id;
-                        localUsers[user.username].role = user.role || 'user';
                         localUsers[user.username].createdAt = user.created_at || new Date().toISOString();
                     } else {
                         // 如果用户不存在，创建新用户
@@ -81,7 +80,7 @@ class QuitSmokingApp {
                             id: user.id,
                             username: user.username,
                             password: 'local_user', // 本地用户密码，实际使用时应该加密
-                            role: user.role || 'user',
+                            role: 'user',
                             createdAt: user.created_at || new Date().toISOString()
                         };
                     }
