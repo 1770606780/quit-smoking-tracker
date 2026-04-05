@@ -43,12 +43,50 @@ class QuitSmokingApp {
     async init() {
         this.bindEvents();
         this.supabase = await this.initSupabase();
+        await this.loadUsersFromSupabase();
         this.records = await this.loadRecords();
         this.checkAuth();
         this.renderCalendar();
         this.updateStats();
         this.renderChart();
         this.selectDate(new Date());
+    }
+
+    // 从 Supabase 加载用户信息
+    async loadUsersFromSupabase() {
+        try {
+            if (this.supabase) {
+                const { data, error } = await this.supabase
+                    .from('users')
+                    .select('id, username');
+                
+                if (error) {
+                    console.error('从 Supabase 加载用户信息失败:', error);
+                    return;
+                }
+                
+                console.log('从 Supabase 加载的用户信息:', data);
+                
+                // 更新本地用户信息
+                const localUsers = this.loadUsers();
+                data.forEach(user => {
+                    if (!localUsers[user.username]) {
+                        localUsers[user.username] = {
+                            id: user.id,
+                            username: user.username,
+                            password: 'local_user', // 本地用户密码，实际使用时应该加密
+                            role: 'user',
+                            createdAt: new Date().toISOString()
+                        };
+                    }
+                });
+                
+                this.users = localUsers;
+                this.saveUsers(localUsers);
+            }
+        } catch (error) {
+            console.error('加载用户信息失败:', error);
+        }
     }
 
     // 生成 UUID 的函数
@@ -597,6 +635,7 @@ class QuitSmokingApp {
                             
                             // 检查 users 表中是否存在该用户
                             try {
+                                const currentUsername = localStorage.getItem('currentUsername');
                                 const { data: userData, error: userError } = await this.supabase
                                     .from('users')
                                     .select('id')
@@ -609,7 +648,6 @@ class QuitSmokingApp {
                                 
                                 // 如果用户不存在，先创建用户记录
                                 if (!userData || userData.length === 0) {
-                                    const currentUsername = localStorage.getItem('currentUsername');
                                     const { error: createUserError } = await this.supabase
                                         .from('users')
                                         .insert({
@@ -623,6 +661,17 @@ class QuitSmokingApp {
                                         console.error('创建用户失败:', createUserError);
                                     } else {
                                         console.log('用户创建成功');
+                                        // 更新本地用户信息
+                                        const localUsers = this.loadUsers();
+                                        localUsers[currentUsername] = {
+                                            id: this.currentUser,
+                                            username: currentUsername,
+                                            password: 'local_user',
+                                            role: 'user',
+                                            createdAt: new Date().toISOString()
+                                        };
+                                        this.users = localUsers;
+                                        this.saveUsers(localUsers);
                                     }
                                 }
                             } catch (userError) {
