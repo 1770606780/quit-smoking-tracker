@@ -220,6 +220,13 @@ class QuitSmokingApp {
                         });
                     });
                     console.log('转换后的记录:', records);
+                    
+                    // 更新 this.records 对象
+                    this.records = records;
+                    
+                    // 同时保存到本地存储作为备份
+                    localStorage.setItem('smokingRecords', JSON.stringify(records));
+                    
                     return records;
                 } catch (supabaseError) {
                     console.error('Supabase 操作失败:', supabaseError);
@@ -623,21 +630,25 @@ class QuitSmokingApp {
                             }
                             
                             // 尝试插入记录
-                            const { error } = await this.supabase
+                            const { error, data: insertedData } = await this.supabase
                                 .from('smoking_records')
                                 .insert({
                                     user_id: this.currentUser,
                                     time: new Date().toTimeString().split(' ')[0],
                                     quantity: this.currentQuantity,
                                     note: note
-                                });
+                                })
+                                .select();
                             
                             if (error) {
                                 console.error('保存到 Supabase 失败:', error);
                                 this.showToast('保存到云端失败，使用本地存储');
                             } else {
-                                console.log('保存到 Supabase 成功');
+                                console.log('保存到 Supabase 成功:', insertedData);
                                 this.showToast('记录已保存到云端');
+                                
+                                // 重新加载数据，确保同步
+                                await this.loadRecords();
                             }
                         }
                     } catch (supabaseError) {
