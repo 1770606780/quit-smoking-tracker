@@ -767,7 +767,7 @@ class QuitSmokingApp {
         }
 
         // 验证 recordId 是否有效
-        if (!recordId || isNaN(recordId) || recordId === 'NaN') {
+        if (!recordId || recordId === 'NaN') {
             console.error('无效的记录 ID:', recordId);
             this.showToast('删除记录失败：无效的记录 ID');
             return;
@@ -777,17 +777,22 @@ class QuitSmokingApp {
         if (userRecords[dateKey]) {
             try {
                 if (this.supabase) {
-                    // 确保 recordId 是有效的字符串或数字
-                    const idToDelete = typeof recordId === 'string' ? recordId : recordId.toString();
-                    
-                    // 从 Supabase 删除
-                    const { error } = await this.supabase
-                        .from('smoking_records')
-                        .delete()
-                        .eq('id', idToDelete);
-                    
-                    if (error) {
-                        console.error('从 Supabase 删除失败:', error);
+                    // 检查 recordId 是否为数字
+                    if (!isNaN(recordId)) {
+                        // 对于旧的数字 ID，跳过 Supabase 删除操作
+                        console.log('跳过数字 ID 的 Supabase 删除操作:', recordId);
+                    } else {
+                        // 对于 UUID 格式的 ID，执行 Supabase 删除操作
+                        const { error } = await this.supabase
+                            .from('smoking_records')
+                            .delete()
+                            .eq('id', recordId);
+                        
+                        if (error) {
+                            console.error('从 Supabase 删除失败:', error);
+                        } else {
+                            console.log('从 Supabase 删除成功:', recordId);
+                        }
                     }
                 }
             } catch (error) {
