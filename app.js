@@ -867,7 +867,7 @@ class QuitSmokingApp {
         // 绑定删除事件
         recordsList.querySelectorAll('.delete-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                const recordId = parseInt(e.currentTarget.dataset.id);
+                const recordId = e.currentTarget.dataset.id;
                 this.deleteRecord(dateKey, recordId);
             });
         });
