@@ -597,8 +597,17 @@ class QuitSmokingApp {
             userRecords[dateKey] = [];
         }
 
+        // 生成 UUID 作为记录 ID
+        const generateUUID = () => {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        };
+
         const record = {
-            id: Date.now(),
+            id: generateUUID(),
             quantity: this.currentQuantity,
             note: note,
             timestamp: new Date().toISOString()
